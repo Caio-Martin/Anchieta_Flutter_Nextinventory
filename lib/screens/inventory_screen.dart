@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/inventory_item.dart';
+import '../services/inventory_database_service.dart';
 import '../widgets/inventory_item_card.dart';
 import 'about_screen.dart';
 import 'login_screen.dart';
@@ -14,22 +15,52 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  final List<InventoryItem> _items = [
-    const InventoryItem(
-      id: '1',
-      name: 'Notebook Dell Latitude',
-      code: 'PAT-2026-001',
-      location: 'TI - Sala 02',
-      status: 'Em uso',
-    ),
-  ];
+  final InventoryDatabaseService _database = InventoryDatabaseService.instance;
+  List<InventoryItem> _items = [];
+  bool _isLoading = true;
 
   int _nextAssetNumber = 2;
 
-  String _generateAssetCode() {
-    final code = 'PAT-2026-${_nextAssetNumber.toString().padLeft(3, '0')}';
-    _nextAssetNumber++;
-    return code;
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final items = await _database.getItems();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _items = items;
+      _nextAssetNumber = _calculateNextAssetNumber(items);
+      _isLoading = false;
+    });
+  }
+
+  int _calculateNextAssetNumber(List<InventoryItem> items) {
+    var maxNumber = 0;
+    final pattern = RegExp(r'^PAT-\d{4}-(\d+)$');
+
+    for (final current in items) {
+      final match = pattern.firstMatch(current.code);
+      if (match == null) {
+        continue;
+      }
+
+      final value = int.tryParse(match.group(1) ?? '0') ?? 0;
+      if (value > maxNumber) {
+        maxNumber = value;
+      }
+    }
+
+    return maxNumber + 1;
+  }
+
+  String _peekNextAssetCode() {
+    return 'PAT-2026-${_nextAssetNumber.toString().padLeft(3, '0')}';
   }
 
   Future<void> _showItemDialog({InventoryItem? item}) async {
@@ -41,11 +72,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final formKey = GlobalKey<FormState>();
 
     final isNewItem = item == null;
-    final generatedCode = isNewItem ? _generateAssetCode() : item.code;
+    final generatedCode = isNewItem ? _peekNextAssetCode() : item.code;
 
     await showDialog<void>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text(isNewItem ? 'Adicionar item' : 'Editar item'),
           content: SizedBox(
@@ -111,19 +142,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 if (!formKey.currentState!.validate()) {
                   return;
                 }
 
-                setState(() {
+                try {
                   if (isNewItem) {
-                    _items.insert(
-                      0,
+                    await _database.insertItem(
                       InventoryItem(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
                         name: nameController.text.trim(),
@@ -133,20 +163,30 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                     );
                   } else {
-                    final index = _items.indexWhere(
-                      (element) => element.id == item.id,
-                    );
-                    if (index != -1) {
-                      _items[index] = item.copyWith(
+                    await _database.updateItem(
+                      item.copyWith(
                         name: nameController.text.trim(),
                         location: locationController.text.trim(),
                         status: statusController.text.trim(),
-                      );
-                    }
+                      ),
+                    );
                   }
-                });
 
-                Navigator.pop(context);
+                  if (!dialogContext.mounted) {
+                    return;
+                  }
+                  Navigator.pop(dialogContext);
+                  await _loadItems();
+                } catch (_) {
+                  if (!dialogContext.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Nao foi possivel salvar o item.'),
+                    ),
+                  );
+                }
               },
               child: Text(isNewItem ? 'Salvar' : 'Atualizar'),
             ),
@@ -185,9 +225,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return;
     }
 
-    setState(() {
-      _items.removeWhere((element) => element.id == item.id);
-    });
+    await _database.deleteItem(item.id);
+    await _loadItems();
   }
 
   @override
@@ -272,6 +311,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          if (_isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Center(
@@ -399,7 +442,7 @@ class _DialogDropdownState extends State<_DialogDropdown> {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _selectedValue,
+      initialValue: _selectedValue,
       decoration: InputDecoration(
         labelText: widget.label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
