@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/about_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/password_recovery_screen.dart';
 
 void main() {
   runApp(const NextInventoryApp());
@@ -46,6 +47,8 @@ class NextInventoryApp extends StatelessWidget {
         LoginScreen.routeName: (context) => const LoginScreen(),
         InventoryScreen.routeName: (context) => const InventoryScreen(),
         AboutScreen.routeName: (context) => const AboutScreen(),
+        PasswordRecoveryScreen.routeName: (context) =>
+            const PasswordRecoveryScreen(),
       },
     );
   }

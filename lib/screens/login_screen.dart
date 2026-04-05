@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import 'inventory_screen.dart';
+import 'password_recovery_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,22 +39,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Image.asset(
               'assets/images/login_background.jpg',
               fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF0B1F33).withValues(alpha: 0.78),
-                    const Color(0xFF135D66).withValues(alpha: 0.9),
-                    Colors.white,
-                  ],
-                  stops: const [0, 0.38, 1],
-                ),
-              ),
             ),
           ),
           SafeArea(
@@ -181,7 +166,12 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          TextButton(onPressed: () {}, child: const Text('Recuperar senha')),
+          TextButton(
+            onPressed: () {
+              Navigator.pushNamed(context, PasswordRecoveryScreen.routeName);
+            },
+            child: const Text('Recuperar senha'),
+          ),
         ],
       ),
     );

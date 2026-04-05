@@ -24,20 +24,30 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ),
   ];
 
+  int _nextAssetNumber = 2;
+
+  String _generateAssetCode() {
+    final code = 'PAT-2026-${_nextAssetNumber.toString().padLeft(3, '0')}';
+    _nextAssetNumber++;
+    return code;
+  }
+
   Future<void> _showItemDialog({InventoryItem? item}) async {
     final nameController = TextEditingController(text: item?.name ?? '');
-    final codeController = TextEditingController(text: item?.code ?? '');
     final locationController = TextEditingController(
       text: item?.location ?? '',
     );
     final statusController = TextEditingController(text: item?.status ?? '');
     final formKey = GlobalKey<FormState>();
 
+    final isNewItem = item == null;
+    final generatedCode = isNewItem ? _generateAssetCode() : item.code;
+
     await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(item == null ? 'Adicionar item' : 'Editar item'),
+          title: Text(isNewItem ? 'Adicionar item' : 'Editar item'),
           content: SizedBox(
             width: 420,
             child: Form(
@@ -46,27 +56,53 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Exibir patrimônio como texto (não editável)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Patrimônio',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            generatedCode,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     _DialogTextField(
                       controller: nameController,
-                      label: 'Nome',
-                    ), // transformar em auto-complete com itens ja cadastrados
-                    const SizedBox(height: 12),
-                    _DialogTextField(
-                      controller: codeController,
-                      label:
-                          'Patrimonio ou codigo', // transformar em auto-incremental
+                      label: 'Nome do item',
+                      hintText: 'Ex: Notebook, Monitor, Teclado...',
                     ),
                     const SizedBox(height: 12),
                     _DialogTextField(
                       controller: locationController,
-                      label:
-                          'Localizacao', //  transformar em dropdown com setores pre-definidos
+                      label: 'Localização',
+                      hintText: 'Ex: TI - Sala 02',
                     ),
                     const SizedBox(height: 12),
-                    _DialogTextField(
+                    _DialogDropdown(
                       controller: statusController,
-                      label:
-                          'Status', // transformar em dropdown com opcoes pre-definidas (Em uso, Disponivel, Manutencao, Baixado)
+                      label: 'Status',
+                      items: const [
+                        'Em uso',
+                        'Disponível',
+                        'Manutenção',
+                        'Baixado',
+                      ],
                     ),
                   ],
                 ),
@@ -85,13 +121,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 }
 
                 setState(() {
-                  if (item == null) {
+                  if (isNewItem) {
                     _items.insert(
                       0,
                       InventoryItem(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
                         name: nameController.text.trim(),
-                        code: codeController.text.trim(),
+                        code: generatedCode,
                         location: locationController.text.trim(),
                         status: statusController.text.trim(),
                       ),
@@ -103,7 +139,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     if (index != -1) {
                       _items[index] = item.copyWith(
                         name: nameController.text.trim(),
-                        code: codeController.text.trim(),
                         location: locationController.text.trim(),
                         status: statusController.text.trim(),
                       );
@@ -113,7 +148,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                 Navigator.pop(context);
               },
-              child: Text(item == null ? 'Salvar' : 'Atualizar'),
+              child: Text(isNewItem ? 'Salvar' : 'Atualizar'),
             ),
           ],
         );
@@ -121,7 +156,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
 
     nameController.dispose();
-    codeController.dispose();
     locationController.dispose();
     statusController.dispose();
   }
@@ -303,19 +337,89 @@ class _InventoryScreenState extends State<InventoryScreen> {
 }
 
 class _DialogTextField extends StatelessWidget {
-  const _DialogTextField({required this.controller, required this.label});
+  const _DialogTextField({
+    required this.controller,
+    required this.label,
+    this.hintText,
+  });
 
   final TextEditingController controller;
   final String label;
+  final String? hintText;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+      ),
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
-          return 'Preencha este campo.';
+          return 'Campo obrigatório';
+        }
+        return null;
+      },
+    );
+  }
+}
+
+class _DialogDropdown extends StatefulWidget {
+  const _DialogDropdown({
+    required this.controller,
+    required this.label,
+    required this.items,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final List<String> items;
+
+  @override
+  State<_DialogDropdown> createState() => _DialogDropdownState();
+}
+
+class _DialogDropdownState extends State<_DialogDropdown> {
+  late String _selectedValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedValue = widget.controller.text.isNotEmpty
+        ? widget.controller.text
+        : widget.items.first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      value: _selectedValue,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+      ),
+      items: widget.items
+          .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          _selectedValue = value!;
+          widget.controller.text = value;
+        });
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Selecione um status';
         }
         return null;
       },
