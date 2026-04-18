@@ -177,27 +177,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0F2F1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF0F766E),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
