@@ -28,4 +28,24 @@ class InventoryItem {
       status: status ?? this.status,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'code': code,
+      'location': location,
+      'status': status,
+    };
+  }
+
+  factory InventoryItem.fromMap(Map<String, dynamic> map) {
+    return InventoryItem(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      code: map['code'] as String,
+      location: map['location'] as String,
+      status: map['status'] as String,
+    );
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/inventory_item.dart';
+import '../services/inventory_database_service.dart';
 import '../widgets/inventory_item_card.dart';
 import 'about_screen.dart';
 import 'login_screen.dart';
@@ -14,150 +15,60 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  final List<InventoryItem> _items = [
-    const InventoryItem(
-      id: '1',
-      name: 'Notebook Dell Latitude',
-      code: 'PAT-2026-001',
-      location: 'TI - Sala 02',
-      status: 'Em uso',
-    ),
-  ];
+  final InventoryDatabaseService _database = InventoryDatabaseService.instance;
+  List<InventoryItem> _items = [];
+  bool _isLoading = true;
 
   int _nextAssetNumber = 2;
 
-  String _generateAssetCode() {
-    final code = 'PAT-2026-${_nextAssetNumber.toString().padLeft(3, '0')}';
-    _nextAssetNumber++;
-    return code;
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final items = await _database.getItems();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _items = items;
+      _nextAssetNumber = _calculateNextAssetNumber(items);
+      _isLoading = false;
+    });
+  }
+
+  int _calculateNextAssetNumber(List<InventoryItem> items) {
+    var maxNumber = 0;
+    final pattern = RegExp(r'^PAT-\d{4}-(\d+)$');
+
+    for (final current in items) {
+      final match = pattern.firstMatch(current.code);
+      if (match == null) {
+        continue;
+      }
+
+      final value = int.tryParse(match.group(1) ?? '0') ?? 0;
+      if (value > maxNumber) {
+        maxNumber = value;
+      }
+    }
+
+    return maxNumber + 1;
   }
 
   Future<void> _showItemDialog({InventoryItem? item}) async {
-    final nameController = TextEditingController(text: item?.name ?? '');
-    final locationController = TextEditingController(
-      text: item?.location ?? '',
-    );
-    final statusController = TextEditingController(text: item?.status ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    final isNewItem = item == null;
-    final generatedCode = isNewItem ? _generateAssetCode() : item.code;
-
     await showDialog<void>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(isNewItem ? 'Adicionar item' : 'Editar item'),
-          content: SizedBox(
-            width: 420,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Exibir patrimônio como texto (não editável)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Patrimônio',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: Colors.grey[600]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            generatedCode,
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _DialogTextField(
-                      controller: nameController,
-                      label: 'Nome do item',
-                      hintText: 'Ex: Notebook, Monitor, Teclado...',
-                    ),
-                    const SizedBox(height: 12),
-                    _DialogTextField(
-                      controller: locationController,
-                      label: 'Localização',
-                      hintText: 'Ex: TI - Sala 02',
-                    ),
-                    const SizedBox(height: 12),
-                    _DialogDropdown(
-                      controller: statusController,
-                      label: 'Status',
-                      items: const [
-                        'Em uso',
-                        'Disponível',
-                        'Manutenção',
-                        'Baixado',
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) {
-                  return;
-                }
-
-                setState(() {
-                  if (isNewItem) {
-                    _items.insert(
-                      0,
-                      InventoryItem(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        name: nameController.text.trim(),
-                        code: generatedCode,
-                        location: locationController.text.trim(),
-                        status: statusController.text.trim(),
-                      ),
-                    );
-                  } else {
-                    final index = _items.indexWhere(
-                      (element) => element.id == item.id,
-                    );
-                    if (index != -1) {
-                      _items[index] = item.copyWith(
-                        name: nameController.text.trim(),
-                        location: locationController.text.trim(),
-                        status: statusController.text.trim(),
-                      );
-                    }
-                  }
-                });
-
-                Navigator.pop(context);
-              },
-              child: Text(isNewItem ? 'Salvar' : 'Atualizar'),
-            ),
-          ],
-        );
-      },
+      builder: (context) => _ItemDialog(
+        item: item,
+        database: _database,
+        nextAssetNumber: _nextAssetNumber,
+        onSaved: _loadItems,
+      ),
     );
-
-    nameController.dispose();
-    locationController.dispose();
-    statusController.dispose();
   }
 
   Future<void> _deleteItem(InventoryItem item) async {
@@ -185,9 +96,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return;
     }
 
-    setState(() {
-      _items.removeWhere((element) => element.id == item.id);
-    });
+    final deleted = await _database.deleteItem(item.id);
+    if (!mounted) {
+      return;
+    }
+
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Item nao encontrado para exclusao.')),
+      );
+      return;
+    }
+
+    await _loadItems();
   }
 
   @override
@@ -272,6 +193,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          if (_isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Center(
@@ -336,6 +261,178 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 }
 
+class _ItemDialog extends StatefulWidget {
+  const _ItemDialog({
+    required this.item,
+    required this.database,
+    required this.nextAssetNumber,
+    required this.onSaved,
+  });
+
+  final InventoryItem? item;
+  final InventoryDatabaseService database;
+  final int nextAssetNumber;
+  final VoidCallback onSaved;
+
+  @override
+  State<_ItemDialog> createState() => _ItemDialogState();
+}
+
+class _ItemDialogState extends State<_ItemDialog> {
+  late TextEditingController nameController;
+  late TextEditingController locationController;
+  late TextEditingController statusController;
+  late GlobalKey<FormState> formKey;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController = TextEditingController(text: widget.item?.name ?? '');
+    locationController = TextEditingController(
+      text: widget.item?.location ?? '',
+    );
+    statusController = TextEditingController(text: widget.item?.status ?? '');
+    formKey = GlobalKey<FormState>();
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    locationController.dispose();
+    statusController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNewItem = widget.item == null;
+    final generatedCode = isNewItem
+        ? 'PAT-2026-${widget.nextAssetNumber.toString().padLeft(3, '0')}'
+        : widget.item!.code;
+
+    return AlertDialog(
+      title: Text(isNewItem ? 'Adicionar item' : 'Editar item'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Patrimônio',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        generatedCode,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _DialogTextField(
+                  controller: nameController,
+                  label: 'Nome do item',
+                  hintText: 'Ex: Notebook, Monitor, Teclado...',
+                ),
+                const SizedBox(height: 12),
+                _DialogTextField(
+                  controller: locationController,
+                  label: 'Localização',
+                  hintText: 'Ex: TI - Sala 02',
+                ),
+                const SizedBox(height: 12),
+                _DialogDropdown(
+                  controller: statusController,
+                  label: 'Status',
+                  items: const [
+                    'Em uso',
+                    'Disponível',
+                    'Manutenção',
+                    'Baixado',
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            if (!formKey.currentState!.validate()) {
+              return;
+            }
+
+            try {
+              if (isNewItem) {
+                await widget.database.createItem(
+                  name: nameController.text.trim(),
+                  code: generatedCode,
+                  location: locationController.text.trim(),
+                  status: statusController.text.trim(),
+                );
+              } else {
+                await widget.database.updateItem(
+                  widget.item!.copyWith(
+                    name: nameController.text.trim(),
+                    location: locationController.text.trim(),
+                    status: statusController.text.trim(),
+                  ),
+                );
+              }
+
+              if (!mounted) {
+                return;
+              }
+              Navigator.pop(context);
+              widget.onSaved();
+            } on InventoryDatabaseException catch (error) {
+              if (!mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(error.message)));
+            } catch (_) {
+              if (!mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Nao foi possivel salvar o item.'),
+                ),
+              );
+            }
+          },
+          child: Text(isNewItem ? 'Salvar' : 'Atualizar'),
+        ),
+      ],
+    );
+  }
+}
+
 class _DialogTextField extends StatelessWidget {
   const _DialogTextField({
     required this.controller,
@@ -394,12 +491,14 @@ class _DialogDropdownState extends State<_DialogDropdown> {
     _selectedValue = widget.controller.text.isNotEmpty
         ? widget.controller.text
         : widget.items.first;
+
+    widget.controller.text = _selectedValue;
   }
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _selectedValue,
+      initialValue: _selectedValue,
       decoration: InputDecoration(
         labelText: widget.label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),

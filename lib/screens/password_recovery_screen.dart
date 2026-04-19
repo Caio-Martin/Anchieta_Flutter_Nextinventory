@@ -18,7 +18,6 @@ class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
   final _formKey = GlobalKey<FormState>();
 
   int _currentStep = 0;
-  bool _isVerificationCodeSent = false;
   bool _isLoadingVerification = false;
   bool _isLoadingReset = false;
 
@@ -43,7 +42,6 @@ class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
 
     setState(() {
       _isLoadingVerification = false;
-      _isVerificationCodeSent = true;
       _currentStep = 1;
     });
 
