@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../widgets/custom_text_field.dart';
 import 'inventory_screen.dart';
 import 'password_recovery_screen.dart';
@@ -15,6 +16,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final IAuthService _authService = AuthConfig.createService();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -23,8 +26,53 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    Navigator.pushReplacementNamed(context, InventoryScreen.routeName);
+  Future<void> _handleLogin() async {
+    final username = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Informe usuario e senha.')));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await _authService.login(username, password);
+
+      if (!mounted) {
+        return;
+      }
+
+      final accessToken =
+          result['access_token'] ?? result['accessToken'] ?? result['token'];
+      debugPrint('Token recebido: $accessToken');
+      Navigator.pushReplacementNamed(context, InventoryScreen.routeName);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final errorMessage = error.toString().replaceAll('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -139,16 +187,16 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 24),
           CustomTextField(
             controller: _emailController,
-            label: 'Usuario ou e-mail',
-            hintText: 'exemplo@edu.anchieta.br',
+            label: 'Usuario',
+            hintText: 'emilys',
             prefixIcon: Icons.person_outline,
-            keyboardType: TextInputType.emailAddress,
+            keyboardType: TextInputType.text,
           ),
           const SizedBox(height: 16),
           CustomTextField(
             controller: _passwordController,
             label: 'Senha',
-            hintText: 'Digite sua senha',
+            hintText: 'emilyspass',
             prefixIcon: Icons.lock_outline,
             obscureText: true,
           ),
@@ -156,13 +204,19 @@ class _LoginScreenState extends State<LoginScreen> {
           SizedBox(
             height: 54,
             child: FilledButton(
-              onPressed: _handleLogin,
+              onPressed: _isLoading ? null : _handleLogin,
               style: FilledButton.styleFrom(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
                 ),
               ),
-              child: const Text('Entrar'),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    )
+                  : const Text('Entrar'),
             ),
           ),
           const SizedBox(height: 12),

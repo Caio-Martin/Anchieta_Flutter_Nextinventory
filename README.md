@@ -34,11 +34,18 @@ O foco da aplicacao e oferecer uma experiencia simples para controle de ativos, 
 ### 1. Login
 
 - Tela inicial da aplicacao
-- Campos de usuario/e-mail e senha
-- Botao para entrar (redireciona para inventario)
+- Campos de usuario e senha
+- Botao para entrar (redireciona para inventario apos autenticar)
 - Atalho para recuperacao de senha
 
-Observacao: nesta versao, o login ainda nao valida credenciais em backend.
+Observacao: por padrao, o app autentica no endpoint publico do DummyJSON em `https://dummyjson.com/auth/login`.
+
+Credenciais de teste para a API real:
+
+- Usuario: `emilys`
+- Senha: `emilyspass`
+
+Para manter o modo mock, use `--dart-define=NEXTINVENTORY_AUTH_MOCK=true`.
 
 ### 2. Recuperacao de senha
 
@@ -77,16 +84,11 @@ Fluxo com duas etapas:
 
 - flutter
 - cupertino_icons
+- http
 - sqflite
 - sqflite_common_ffi
 - path
 - flutter_lints (dev)
-
-### Organizacao por camadas
-
-- Presentation: telas em lib/screens e componentes em lib/widgets
-- Domain model: entidade InventoryItem em lib/models
-- Data access: InventoryDatabaseService em lib/services
 
 ## Estrutura do projeto
 
@@ -129,9 +131,28 @@ Rotas registradas:
 Fluxo principal:
 
 1. App inicia em /login
-2. Ao entrar, navega para /inventory
+2. Ao autenticar com sucesso, navega para /inventory
 3. A partir do inventario, o usuario pode abrir /about
 4. Na tela de login, o usuario pode seguir para /password-recovery
+
+## Autenticacao
+
+### Endpoint padrao
+
+- `https://dummyjson.com/auth/login`
+
+### Payload enviado
+
+```json
+{
+    "username": "emilys",
+    "password": "emilyspass"
+}
+```
+
+### Resposta esperada
+
+O app aceita `accessToken`, `access_token` ou `token` na resposta e segue para a tela de inventario quando a autenticacao retorna `200`.
 
 ## Persistencia de dados (SQLite)
 
