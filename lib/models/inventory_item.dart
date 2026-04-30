@@ -4,6 +4,7 @@ class InventoryItem {
   final String code;
   final String location;
   final String status;
+  final String description;
 
   const InventoryItem({
     required this.id,
@@ -11,6 +12,7 @@ class InventoryItem {
     required this.code,
     required this.location,
     required this.status,
+    required this.description,
   });
 
   InventoryItem copyWith({
@@ -19,6 +21,7 @@ class InventoryItem {
     String? code,
     String? location,
     String? status,
+    String? description,
   }) {
     return InventoryItem(
       id: id ?? this.id,
@@ -26,6 +29,7 @@ class InventoryItem {
       code: code ?? this.code,
       location: location ?? this.location,
       status: status ?? this.status,
+      description: description ?? this.description,
     );
   }
 
@@ -36,6 +40,7 @@ class InventoryItem {
       'code': code,
       'location': location,
       'status': status,
+      'description': description,
     };
   }
 
@@ -46,6 +51,7 @@ class InventoryItem {
       code: map['code'] as String,
       location: map['location'] as String,
       status: map['status'] as String,
+      description: map['description'] as String? ?? '',
     );
   }
 }

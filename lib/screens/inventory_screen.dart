@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+
 import '../models/inventory_item.dart';
+import '../services/gemini_service.dart';
 import '../services/inventory_database_service.dart';
 import '../widgets/inventory_item_card.dart';
 import 'about_screen.dart';
@@ -282,7 +286,9 @@ class _ItemDialogState extends State<_ItemDialog> {
   late TextEditingController nameController;
   late TextEditingController locationController;
   late TextEditingController statusController;
+  late TextEditingController descriptionController;
   late GlobalKey<FormState> formKey;
+  bool _isAnalyzingImage = false;
 
   @override
   void initState() {
@@ -292,6 +298,7 @@ class _ItemDialogState extends State<_ItemDialog> {
       text: widget.item?.location ?? '',
     );
     statusController = TextEditingController(text: widget.item?.status ?? '');
+    descriptionController = TextEditingController(text: widget.item?.description ?? '');
     formKey = GlobalKey<FormState>();
   }
 
@@ -300,6 +307,7 @@ class _ItemDialogState extends State<_ItemDialog> {
     nameController.dispose();
     locationController.dispose();
     statusController.dispose();
+    descriptionController.dispose();
     super.dispose();
   }
 
@@ -309,6 +317,74 @@ class _ItemDialogState extends State<_ItemDialog> {
     final generatedCode = isNewItem
         ? 'PAT-2026-${widget.nextAssetNumber.toString().padLeft(3, '0')}'
         : widget.item!.code;
+
+    Future<void> handleImageCapture(ImageSource source) async {
+      try {
+        final picker = ImagePicker();
+        final pickedFile = await picker.pickImage(
+          source: source,
+          maxWidth: 1024,
+          maxHeight: 1024,
+        );
+
+        if (pickedFile == null) return;
+
+        setState(() {
+          _isAnalyzingImage = true;
+        });
+
+        final bytes = await pickedFile.readAsBytes();
+        final mimeType = lookupMimeType(pickedFile.name) ?? 'image/jpeg';
+
+        final details = await GeminiService.instance
+            .generateItemDetailsFromImage(bytes, mimeType);
+
+        if (!mounted) return;
+
+        setState(() {
+          nameController.text = details.name;
+          descriptionController.text = details.description;
+          _isAnalyzingImage = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isAnalyzingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao analisar imagem: $e')),
+        );
+      }
+    }
+
+    void showImageSourceOptions() {
+      showModalBottomSheet(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Tirar foto com a câmera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  handleImageCapture(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Escolher da galeria'),
+                onTap: () {
+                  Navigator.pop(context);
+                  handleImageCapture(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return AlertDialog(
       title: Text(isNewItem ? 'Adicionar item' : 'Editar item'),
@@ -327,22 +403,46 @@ class _ItemDialogState extends State<_ItemDialog> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey[300]!),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Patrimônio',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Patrimônio',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            generatedCode,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        generatedCode,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+                      if (_isAnalyzingImage)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 8.0),
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          onPressed: showImageSourceOptions,
+                          icon: const Icon(Icons.auto_awesome, size: 18),
+                          label: const Text('Identificar Foto'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -357,6 +457,14 @@ class _ItemDialogState extends State<_ItemDialog> {
                   controller: locationController,
                   label: 'Localização',
                   hintText: 'Ex: TI - Sala 02',
+                ),
+                const SizedBox(height: 12),
+                _DialogTextField(
+                  controller: descriptionController,
+                  label: 'Descrição',
+                  hintText: 'Descrição ou características...',
+                  maxLines: 3,
+                  isRequired: false,
                 ),
                 const SizedBox(height: 12),
                 _DialogDropdown(
@@ -392,6 +500,7 @@ class _ItemDialogState extends State<_ItemDialog> {
                   code: generatedCode,
                   location: locationController.text.trim(),
                   status: statusController.text.trim(),
+                  description: descriptionController.text.trim(),
                 );
               } else {
                 await widget.database.updateItem(
@@ -399,6 +508,7 @@ class _ItemDialogState extends State<_ItemDialog> {
                     name: nameController.text.trim(),
                     location: locationController.text.trim(),
                     status: statusController.text.trim(),
+                    description: descriptionController.text.trim(),
                   ),
                 );
               }
@@ -438,16 +548,22 @@ class _DialogTextField extends StatelessWidget {
     required this.controller,
     required this.label,
     this.hintText,
+    this.maxLines = 1,
+    this.isRequired = true,
   });
 
   final TextEditingController controller;
   final String label;
   final String? hintText;
+  final int maxLines;
+  final bool isRequired;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
+      maxLines: maxLines,
+      minLines: 1,
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
@@ -458,7 +574,7 @@ class _DialogTextField extends StatelessWidget {
         ),
       ),
       validator: (value) {
-        if (value == null || value.trim().isEmpty) {
+        if (isRequired && (value == null || value.trim().isEmpty)) {
           return 'Campo obrigatório';
         }
         return null;

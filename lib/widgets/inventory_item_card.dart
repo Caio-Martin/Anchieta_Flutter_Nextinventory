@@ -90,6 +90,18 @@ class InventoryItemCard extends StatelessWidget {
               ),
             ],
           ),
+          if (item.description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              item.description,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 14,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
           const SizedBox(height: 18),
           Wrap(
             spacing: 12,

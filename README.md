@@ -58,10 +58,12 @@ Fluxo com duas etapas:
 
 - Listagem de itens cadastrados
 - Cadastro de novo item com:
-    - Nome
+    - Nome (pode ser gerado por IA)
     - Codigo patrimonial gerado automaticamente
     - Localizacao
     - Status
+    - Descricao (pode ser gerada por IA)
+- **NOVO:** Identificação de itens por foto (Câmera ou Galeria) utilizando a API do Google AI Studio (Gemini 1.5 Flash), preenchendo o nome e a descrição do item automaticamente.
 - Edicao de item existente
 - Exclusao com confirmacao
 
@@ -88,11 +90,16 @@ Fluxo com duas etapas:
 - sqflite
 - sqflite_common_ffi
 - path
+- image_picker
+- google_generative_ai
+- flutter_dotenv
+- mime
 - flutter_lints (dev)
 
 ## Estrutura do projeto
 
 ```text
+.env (não comitado)
 lib/
     main.dart
     models/
@@ -103,6 +110,7 @@ lib/
         login_screen.dart
         password_recovery_screen.dart
     services/
+        gemini_service.dart
         inventory_database_service.dart
     widgets/
         custom_text_field.dart
@@ -114,9 +122,10 @@ assets/
 
 Resumo dos principais arquivos:
 
-- lib/main.dart: inicializacao do app, tema e registro das rotas
+- lib/main.dart: inicializacao do app, carregamento do `.env`, tema e registro das rotas
 - lib/services/inventory_database_service.dart: singleton de acesso ao SQLite
-- lib/screens/inventory_screen.dart: tela principal e dialogo de cadastro/edicao
+- lib/services/gemini_service.dart: integracao com Google AI Studio
+- lib/screens/inventory_screen.dart: tela principal e dialogo de cadastro/edicao com suporte a imagens
 - lib/models/inventory_item.dart: modelo de dados do item de inventario
 
 ## Fluxo de navegacao
@@ -168,6 +177,7 @@ Schema da tabela:
 - code: TEXT NOT NULL UNIQUE
 - location: TEXT NOT NULL
 - status: TEXT NOT NULL
+- description: TEXT NOT NULL DEFAULT ''
 - created_at: INTEGER NOT NULL
 
 Indice:
@@ -179,10 +189,24 @@ Indice:
 - Codigo patrimonial unico (restricao UNIQUE)
 - Mensagens de erro amigaveis para violacoes de constraints
 - Ordenacao da listagem por data de criacao (mais novos primeiro)
+- Migrations automáticas no SQLite (via `onUpgrade`) para suportar novos campos como o `description`.
 
+## Integracao com IA (Google Gemini)
+
+O app permite tirar ou selecionar fotos e enviá-las para a API do Google AI Studio para preenchimento automático. 
+Para que isso funcione, é necessário criar um arquivo na raiz do projeto chamado `.env` contendo a seguinte variável:
+
+```env
+GEMINI_API_KEY=sua_chave_de_api_aqui
+```
+
+*Nota: o arquivo `.env` deve ser adicionado ao `.gitignore` para nao vazar credenciais.*
+
+## Como executar
 
 ### 1. Executar
 
 ```bash
 flutter run
 ```
+

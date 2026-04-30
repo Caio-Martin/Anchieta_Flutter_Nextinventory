@@ -18,7 +18,7 @@ class InventoryDatabaseService {
   static final InventoryDatabaseService instance = InventoryDatabaseService._();
 
   static const _databaseName = 'nextinventory.db';
-  static const _databaseVersion = 1;
+  static const _databaseVersion = 2;
   static const _tableName = 'inventory_items';
 
   Database? _database;
@@ -54,6 +54,7 @@ class InventoryDatabaseService {
             code TEXT NOT NULL UNIQUE,
             location TEXT NOT NULL,
             status TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
             created_at INTEGER NOT NULL
           )
         ''');
@@ -61,6 +62,13 @@ class InventoryDatabaseService {
         await db.execute(
           'CREATE INDEX idx_inventory_items_created_at ON $_tableName (created_at DESC)',
         );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE $_tableName ADD COLUMN description TEXT NOT NULL DEFAULT ""',
+          );
+        }
       },
     );
   }
@@ -106,6 +114,7 @@ class InventoryDatabaseService {
     required String code,
     required String location,
     required String status,
+    required String description,
   }) async {
     final item = InventoryItem(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -113,6 +122,7 @@ class InventoryDatabaseService {
       code: code.trim(),
       location: location.trim(),
       status: status.trim(),
+      description: description.trim(),
     );
 
     await insertItem(item);
