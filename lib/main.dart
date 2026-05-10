@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'screens/about_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/password_recovery_screen.dart';
@@ -60,6 +61,7 @@ class NextInventoryApp extends StatelessWidget {
         AboutScreen.routeName: (context) => const AboutScreen(),
         PasswordRecoveryScreen.routeName: (context) =>
             const PasswordRecoveryScreen(),
+        ChatScreen.routeName: (context) => const ChatScreen(),
       },
     );
   }

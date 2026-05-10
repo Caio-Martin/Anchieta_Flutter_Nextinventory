@@ -16,7 +16,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final IAuthService _authService = AuthConfig.createService();
   bool _isLoading = false;
 
   @override
@@ -42,15 +41,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await _authService.login(username, password);
+      await AuthService.instance.login(username, password);
 
-      if (!mounted) {
-        return;
-      }
-
-      final accessToken =
-          result['access_token'] ?? result['accessToken'] ?? result['token'];
-      debugPrint('Token recebido: $accessToken');
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, InventoryScreen.routeName);
     } catch (error) {
       if (!mounted) {
@@ -65,13 +58,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
-
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -187,8 +178,8 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 24),
           CustomTextField(
             controller: _emailController,
-            label: 'Usuario',
-            hintText: 'emilys',
+            label: 'Usuário',
+            hintText: 'seu.usuario',
             prefixIcon: Icons.person_outline,
             keyboardType: TextInputType.text,
           ),
@@ -196,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
           CustomTextField(
             controller: _passwordController,
             label: 'Senha',
-            hintText: 'emilyspass',
+            hintText: '••••••••',
             prefixIcon: Icons.lock_outline,
             obscureText: true,
           ),
