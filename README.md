@@ -15,8 +15,6 @@ Desenvolvido no contexto acadêmico da disciplina de Desenvolvimento Mobile (Fac
 - [Fluxo de navegação](#fluxo-de-navegação)
 - [Persistência de dados (SQLite)](#persistência-de-dados-sqlite)
 - [Como executar o projeto](#como-executar-o-projeto)
-- [Comandos úteis](#comandos-úteis)
-- [Branches](#branches)
 
 ---
 
@@ -36,7 +34,7 @@ O NextInventory é um aplicativo móvel multiplataforma (iOS/Android) que permit
 ### 1. Login
 
 - Campos de usuário e senha
-- Autenticação contra a API real: `https://mobile-ios-login.zani0x03.eti.br`
+- Autenticação com API real: `https://mobile-ios-login.zani0x03.eti.br`
 - Token de acesso salvo em memória via singleton (`AuthService`)
 - Redirecionamento automático para a tela de inventário após sucesso
 
@@ -150,25 +148,6 @@ assets/
 | Login | `POST` | `https://mobile-ios-login.zani0x03.eti.br/api/auth/login` |
 | Registro | `POST` | `https://mobile-ios-login.zani0x03.eti.br/api/register` |
 
-### Payload de login
-
-```json
-{
-  "username": "seu_usuario",
-  "password": "sua_senha",
-  "sistemaId": "ab1a8a3b-21c8-422e-95cd-13c16a45e2ec"
-}
-```
-
-### Resposta esperada
-
-O app aceita qualquer um dos campos: `accessToken`, `access_token` ou `token`.
-
-```json
-{
-  "accessToken": "eyJhbGci..."
-}
-```
 
 ### Gerenciamento de token
 
@@ -276,5 +255,3 @@ flutter run
 # 3. Executar em dispositivo específico
 flutter run -d <device-id>
 ```
-
----
