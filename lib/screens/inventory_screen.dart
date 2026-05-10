@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/inventory_item.dart';
+import '../services/auth_service.dart';
 import '../services/inventory_database_service.dart';
 import '../widgets/inventory_item_card.dart';
 import 'about_screen.dart';
+import 'chat_screen.dart';
 import 'login_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -119,6 +121,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
         actions: [
           IconButton(
             onPressed: () {
+              Navigator.pushNamed(context, ChatScreen.routeName);
+            },
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Assistente IA',
+          ),
+          IconButton(
+            onPressed: () {
               Navigator.pushNamed(context, AboutScreen.routeName);
             },
             icon: const Icon(Icons.info_outline),
@@ -168,6 +177,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
+                leading: const Icon(Icons.chat_bubble_outline),
+                title: const Text('Assistente IA'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, ChatScreen.routeName);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.info_outline),
                 title: const Text('Sobre'),
                 onTap: () {
@@ -180,6 +197,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 leading: const Icon(Icons.logout),
                 title: const Text('Sair'),
                 onTap: () {
+                  AuthService.instance.logout();
                   Navigator.pop(context);
                   Navigator.pushReplacementNamed(
                     context,

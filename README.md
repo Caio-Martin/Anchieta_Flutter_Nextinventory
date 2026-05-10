@@ -1,188 +1,257 @@
 # NextInventory
 
-Aplicativo Flutter para gestao de inventario, com interface responsiva, fluxo basico de autenticacao e persistencia local com SQLite.
+Aplicativo Flutter para gestão de inventário, com autenticação via API real, assistente de IA integrado e persistência local com SQLite.
 
-Este projeto foi desenvolvido no contexto academico da disciplina de Desenvolvimento Mobile (Faculdade Anchieta), mas ja possui uma base organizada para evolucao em cenarios reais.
+Desenvolvido no contexto acadêmico da disciplina de Desenvolvimento Mobile (Faculdade Anchieta), com arquitetura voltada para cenários reais de produção.
 
-## Sumario
+## Sumário
 
-- Visao geral
-- Funcionalidades
-- Tecnologias e arquitetura
-- Estrutura do projeto
-- Fluxo de navegacao
-- Persistencia de dados (SQLite)
-- Como executar o projeto
-- Comandos uteis
-- Qualidade e padroes
-- Troubleshooting
-- Melhorias sugeridas
+- [Visão geral](#visão-geral)
+- [Funcionalidades](#funcionalidades)
+- [Tecnologias e arquitetura](#tecnologias-e-arquitetura)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Autenticação](#autenticação)
+- [Assistente de IA](#assistente-de-ia)
+- [Fluxo de navegação](#fluxo-de-navegação)
+- [Persistência de dados (SQLite)](#persistência-de-dados-sqlite)
+- [Como executar o projeto](#como-executar-o-projeto)
 
-## Visao geral
+---
 
-O NextInventory permite:
+## Visão geral
 
-- Acesso a uma tela de login (navegacao inicial)
-- Recuperacao de senha em duas etapas (simulada)
-- Cadastro, listagem, edicao e exclusao de itens de inventario
-- Armazenamento local dos itens em banco SQLite
+O NextInventory é um aplicativo móvel multiplataforma (iOS/Android) que permite:
 
-O foco da aplicacao e oferecer uma experiencia simples para controle de ativos, com codigos patrimoniais gerados automaticamente.
+- Autenticação real via API REST dedicada
+- Cadastro, listagem, edição e exclusão de itens de inventário com persistência local
+- Chat com assistente de IA contextualizado para suporte ao inventário
+- Recuperação de senha em duas etapas (simulada)
+
+---
 
 ## Funcionalidades
 
 ### 1. Login
 
-- Tela inicial da aplicacao
-- Campos de usuario e senha
-- Botao para entrar (redireciona para inventario apos autenticar)
-- Atalho para recuperacao de senha
+- Campos de usuário e senha
+- Autenticação com API real: `https://mobile-ios-login.zani0x03.eti.br`
+- Token de acesso salvo em memória via singleton (`AuthService`)
+- Redirecionamento automático para a tela de inventário após sucesso
 
-Observacao: por padrao, o app autentica no endpoint publico do DummyJSON em `https://dummyjson.com/auth/login`.
+### 2. Registro de usuário
 
-Credenciais de teste para a API real:
+- Cadastro de novo usuário diretamente pela API
+- Campos: nome, sobrenome, login, e-mail e senha
+- Endpoint: `POST /api/register`
 
-- Usuario: `emilys`
-- Senha: `emilyspass`
+### 3. Recuperação de senha
 
-Para manter o modo mock, use `--dart-define=NEXTINVENTORY_AUTH_MOCK=true`.
+Fluxo simulado em duas etapas:
 
-### 2. Recuperacao de senha
+- **Etapa 1:** envio de código de verificação por e-mail
+- **Etapa 2:** validação do código e definição de nova senha
 
-Fluxo com duas etapas:
+### 4. Inventário (CRUD)
 
-- Etapa 1: envio de codigo de verificacao por e-mail (simulado)
-- Etapa 2: validacao de codigo e definicao de nova senha (simulado)
-
-### 3. Inventario (CRUD)
-
-- Listagem de itens cadastrados
+- Listagem de itens cadastrados ordenada por data de criação (mais novos primeiro)
 - Cadastro de novo item com:
-    - Nome
-    - Codigo patrimonial gerado automaticamente
-    - Localizacao
-    - Status
-- Edicao de item existente
-- Exclusao com confirmacao
+  - Nome
+  - Código patrimonial gerado automaticamente (único)
+  - Localização
+  - Status
+- Edição de item existente
+- Exclusão com diálogo de confirmação
 
-### 4. Tela Sobre
+### 5. Chat com IA
 
-- Informacoes resumidas do aplicativo
-- Versao atual exibida na interface
+- Interface de chat com bolhas de mensagem diferenciadas (usuário / IA)
+- Indicador de carregamento enquanto aguarda resposta
+- Integração com endpoint de IA via `Bearer Token` herdado do login
+- Aceita campos de resposta: `response`, `message`, `answer` ou `content`
+
+### 6. Tela Sobre
+
+- Informações resumidas do aplicativo
+- Versão atual exibida na interface
+
+---
 
 ## Tecnologias e arquitetura
 
 ### Stack principal
 
-- Flutter (UI)
-- Dart
-- SQLite local com sqflite
-- sqflite_common_ffi para desktop (Windows/Linux)
-- path para montagem de caminho do banco
+| Camada | Tecnologia |
+|---|---|
+| UI | Flutter / Dart |
+| HTTP | `http ^1.6.0` |
+| Banco local | `sqflite ^2.4.2` + `sqflite_common_ffi ^2.3.6` |
+| Caminhos | `path ^1.9.1` |
+| Ícones | `cupertino_icons ^1.0.8` |
 
-### Dependencias (pubspec)
+### Padrões adotados
 
-- flutter
-- cupertino_icons
-- http
-- sqflite
-- sqflite_common_ffi
-- path
-- flutter_lints (dev)
+- **Singleton** para `AuthService`, `AiService` e `InventoryDatabaseService`
+- Token de sessão gerenciado em memória via `AuthService.token` (estático)
+- Separação clara entre camadas: `screens/`, `services/`, `widgets/`, `utils/`, `models/`
+- Constantes centralizadas em `AppConstants` (`lib/utils/constants.dart`)
+
+---
 
 ## Estrutura do projeto
 
 ```text
 lib/
-    main.dart
-    models/
-        inventory_item.dart
-    screens/
-        about_screen.dart
-        inventory_screen.dart
-        login_screen.dart
-        password_recovery_screen.dart
-    services/
-        inventory_database_service.dart
-    widgets/
-        custom_text_field.dart
-        inventory_item_card.dart
+├── main.dart
+├── models/
+│   └── inventory_item.dart
+├── screens/
+│   ├── about_screen.dart
+│   ├── chat_screen.dart
+│   ├── inventory_screen.dart
+│   ├── login_screen.dart
+│   └── password_recovery_screen.dart
+├── services/
+│   ├── ai_service.dart
+│   ├── auth_service.dart
+│   └── inventory_database_service.dart
+├── utils/
+│   └── constants.dart
+└── widgets/
+    ├── chat_bubble.dart
+    ├── custom_text_field.dart
+    └── inventory_item_card.dart
 
 assets/
-    images/
+└── images/
 ```
 
-Resumo dos principais arquivos:
+### Principais arquivos
 
-- lib/main.dart: inicializacao do app, tema e registro das rotas
-- lib/services/inventory_database_service.dart: singleton de acesso ao SQLite
-- lib/screens/inventory_screen.dart: tela principal e dialogo de cadastro/edicao
-- lib/models/inventory_item.dart: modelo de dados do item de inventario
+| Arquivo | Responsabilidade |
+|---|---|
+| `main.dart` | Inicialização do app, tema, rotas e FFI para desktop |
+| `utils/constants.dart` | URLs base e IDs de sistema |
+| `services/auth_service.dart` | Login, registro e logout contra a API real; guarda o token |
+| `services/ai_service.dart` | Envio de mensagens ao endpoint de IA com autenticação |
+| `services/inventory_database_service.dart` | CRUD local via SQLite |
+| `screens/chat_screen.dart` | Interface de chat com a IA |
+| `widgets/chat_bubble.dart` | Componente de bolha de mensagem do chat |
 
-## Fluxo de navegacao
+---
 
-Rotas registradas:
+## Autenticação
 
-- /login
-- /inventory
-- /about
-- /password-recovery
+### Endpoints
 
-Fluxo principal:
+| Operação | Método | Endpoint |
+|---|---|---|
+| Login | `POST` | `https://mobile-ios-login.zani0x03.eti.br/api/auth/login` |
+| Registro | `POST` | `https://mobile-ios-login.zani0x03.eti.br/api/register` |
 
-1. App inicia em /login
-2. Ao autenticar com sucesso, navega para /inventory
-3. A partir do inventario, o usuario pode abrir /about
-4. Na tela de login, o usuario pode seguir para /password-recovery
 
-## Autenticacao
+### Gerenciamento de token
 
-### Endpoint padrao
+O token é armazenado em `AuthService._token` (singleton em memória) e compartilhado com `AiService` via `AuthService.token`. É limpo ao chamar `AuthService.instance.logout()`.
 
-- `https://dummyjson.com/auth/login`
+---
 
-### Payload enviado
+## Assistente de IA
+
+### Endpoint
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| Chat | `POST` | `https://mobile-ios-ia.zani0x03.eti.br/api/ai/chat` |
+
+### Payload
 
 ```json
 {
-    "username": "emilys",
-    "password": "emilyspass"
+  "prompt": "mensagem do usuário"
 }
 ```
 
-### Resposta esperada
+### Headers obrigatórios
 
-O app aceita `accessToken`, `access_token` ou `token` na resposta e segue para a tela de inventario quando a autenticacao retorna `200`.
+```
+Content-Type: application/json
+Authorization: Bearer <token>
+```
 
-## Persistencia de dados (SQLite)
+### Campos de resposta aceitos
+
+`response` · `message` · `answer` · `content`
+
+Se nenhum campo for encontrado, o corpo bruto da resposta é exibido como fallback.
+
+---
+
+## Fluxo de navegação
+
+```
+/login
+  ├── (autenticação ok) → /inventory
+  │                           ├── (menu) → /about
+  │                           └── (menu) → /chat
+  └── (link) → /password-recovery
+```
+
+Rotas registradas:
+
+- `/login`
+- `/inventory`
+- `/about`
+- `/password-recovery`
+- `/chat`
+
+---
+
+## Persistência de dados (SQLite)
 
 ### Banco e tabela
 
-- Banco: nextinventory.db
-- Tabela: inventory_items
+- **Banco:** `nextinventory.db`
+- **Tabela:** `inventory_items`
 
-Schema da tabela:
+### Schema
 
-- id: TEXT PRIMARY KEY
-- name: TEXT NOT NULL
-- code: TEXT NOT NULL UNIQUE
-- location: TEXT NOT NULL
-- status: TEXT NOT NULL
-- created_at: INTEGER NOT NULL
+| Coluna | Tipo | Restrição |
+|---|---|---|
+| `id` | TEXT | PRIMARY KEY |
+| `name` | TEXT | NOT NULL |
+| `code` | TEXT | NOT NULL, UNIQUE |
+| `location` | TEXT | NOT NULL |
+| `status` | TEXT | NOT NULL |
+| `created_at` | INTEGER | NOT NULL |
 
-Indice:
+**Índice:** `idx_inventory_items_created_at` em `created_at DESC`
 
-- idx_inventory_items_created_at em created_at DESC
+### Regras
 
-### Regras importantes implementadas
+- Código patrimonial único (restrição `UNIQUE`)
+- Mensagens de erro amigáveis para violações de constraints
+- Listagem ordenada por data de criação (mais novos primeiro)
+- Em modo desktop (Windows/Linux), usa `sqflite_common_ffi`
 
-- Codigo patrimonial unico (restricao UNIQUE)
-- Mensagens de erro amigaveis para violacoes de constraints
-- Ordenacao da listagem por data de criacao (mais novos primeiro)
+---
 
+## Como executar o projeto
 
-### 1. Executar
+### Pré-requisitos
+
+- Flutter SDK `^3.10.4`
+- Dart SDK compatível
+- Dispositivo físico ou emulador iOS/Android (ou desktop para testes)
+
+### Passos
 
 ```bash
+# 1. Instalar dependências
+flutter pub get
+
+# 2. Executar no dispositivo padrão
 flutter run
+
+# 3. Executar em dispositivo específico
+flutter run -d <device-id>
 ```

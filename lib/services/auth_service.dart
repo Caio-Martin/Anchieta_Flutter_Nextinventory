@@ -3,98 +3,116 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-abstract class IAuthService {
-  Future<Map<String, dynamic>> login(String username, String password);
-}
+import '../utils/constants.dart';
 
-class AuthConfig {
-  const AuthConfig._();
+/// Singleton que gerencia autenticação na API real do NextInventory.
+class AuthService {
+  AuthService._();
 
-  static const bool useMock = bool.fromEnvironment(
-    'NEXTINVENTORY_AUTH_MOCK',
-    defaultValue: false,
-  );
+  static final AuthService _instance = AuthService._();
 
-  static const String loginUrl = String.fromEnvironment(
-    'NEXTINVENTORY_AUTH_URL',
-    defaultValue: 'https://dummyjson.com/auth/login',
-    // usar esse usuario para logar na api - emilys / emilyspass
-  );
+  static AuthService get instance => _instance;
 
-  static IAuthService createService() {
-    if (useMock) {
-      return AuthServiceMock();
-    }
+  /// Token de acesso em memória. Null quando não autenticado.
+  static String? _token;
 
-    return AuthService(baseUrl: loginUrl);
-  }
-}
+  static String? get token => _token;
 
-class AuthService implements IAuthService {
-  AuthService({required this.baseUrl, http.Client? client})
-    : _client = client ?? http.Client();
+  final http.Client _client = http.Client();
 
-  final String baseUrl;
-  final http.Client _client;
+  // ─── Login ────────────────────────────────────────────────────────────────
 
-  @override
-  Future<Map<String, dynamic>> login(String username, String password) async {
+  /// Realiza login na API real e armazena o token em memória.
+  /// Retorna [true] em caso de sucesso; lança [Exception] em caso de erro.
+  Future<bool> login(String username, String password) async {
+    final uri = Uri.parse('${AppConstants.authBaseUrl}/api/auth/login');
+
+    final http.Response response;
     try {
-      final response = await _client.post(
-        Uri.parse(baseUrl),
+      response = await _client.post(
+        uri,
         headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username.trim(), 'password': password}),
+        body: jsonEncode({
+          'username': username.trim(),
+          'password': password,
+          'sistemaId': AppConstants.sistemaId,
+        }),
       );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final accessToken =
-            data['access_token'] ?? data['accessToken'] ?? data['token'];
-        final refreshToken = data['refresh_token'] ?? data['refreshToken'];
-
-        return {
-          ...data,
-          if (accessToken != null) 'access_token': accessToken,
-          if (refreshToken != null) 'refresh_token': refreshToken,
-          if (accessToken != null && data['token_type'] == null)
-            'token_type': 'Bearer',
-        };
-      }
-
-      debugPrint(
-        'Login rejeitado: status=${response.statusCode}, body=${response.body}',
-      );
-
-      if (response.statusCode == 400 || response.statusCode == 401) {
-        throw Exception('Usuario ou senha invalidos.');
-      }
-
-      throw Exception(
-        'Falha no login: ${response.statusCode} - ${response.body}',
-      );
-    } catch (error) {
-      throw Exception('Erro de conexao: $error');
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
     }
+
+    debugPrint('[AuthService] login status=${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final accessToken =
+          data['accessToken'] ?? data['access_token'] ?? data['token'];
+
+      if (accessToken == null) {
+        throw Exception('Token não encontrado na resposta do servidor.');
+      }
+
+      _token = accessToken.toString();
+      debugPrint('[AuthService] Token salvo: $_token');
+      return true;
+    }
+
+    if (response.statusCode == 400 || response.statusCode == 401) {
+      throw Exception('Usuário ou senha inválidos.');
+    }
+
+    throw Exception(
+      'Falha no login: ${response.statusCode} — ${response.body}',
+    );
   }
-}
 
-class AuthServiceMock implements IAuthService {
-  @override
-  Future<Map<String, dynamic>> login(String username, String password) async {
-    await Future.delayed(const Duration(seconds: 1));
+  // ─── Registro ─────────────────────────────────────────────────────────────
 
-    if (username.trim() == 'caio' && password == '123456') {
-      return {
-        'access_token': 'mock-nextinventory-access-token',
-        'expires_in': 299,
-        'refresh_expires_in': 1799,
-        'refresh_token': 'mock-nextinventory-refresh-token',
-        'token_type': 'Bearer',
-        'session_state': '7da70210-f7c6-49fa-87ca-cfe03f78d885',
-        'scope': 'profile email',
-      };
+  /// Registra um novo usuário na API.
+  /// Retorna [true] em caso de sucesso; lança [Exception] em caso de erro.
+  Future<bool> register({
+    required String name,
+    required String surname,
+    required String login,
+    required String email,
+    required String password,
+  }) async {
+    final uri = Uri.parse('${AppConstants.authBaseUrl}/api/register');
+
+    final http.Response response;
+    try {
+      response = await _client.post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'surname': surname,
+          'login': login,
+          'email': email,
+          'password': password,
+          'sistemaId': AppConstants.sistemaId,
+        }),
+      );
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
     }
 
-    throw Exception('Usuario ou senha invalidos (Mock)');
+    debugPrint('[AuthService] register status=${response.statusCode}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return true;
+    }
+
+    throw Exception(
+      'Falha no registro: ${response.statusCode} — ${response.body}',
+    );
+  }
+
+  // ─── Logout ───────────────────────────────────────────────────────────────
+
+  void logout() {
+    _token = null;
+    debugPrint('[AuthService] Token removido.');
   }
 }
