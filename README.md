@@ -1,8 +1,17 @@
 # NextInventory
 
-Aplicativo Flutter para gestão de inventário, com autenticação via API real, assistente de IA integrado e persistência local com SQLite.
+  Aplicativo Flutter para gestão de inventário de TI, com autenticação via API, assistente de IA integrado e persistência local com SQLite.
 
-Desenvolvido no contexto acadêmico da disciplina de Desenvolvimento Mobile (Faculdade Anchieta), com arquitetura voltada para cenários reais de produção.
+Desenvolvido para a disciplina de Desenvolvimento Mobile para IOS no [Centro Universitário Padre Anchieta](https://www.anchieta.br/) sobre a supervisão do docente [Tiago Zaniquelli](https://github.com/zani0x03/), no curso de Ciência da Computação (5º Semestre - 2026), com arquitetura voltada para cenários reais de produção.
+
+---
+## Participantes 
+
+- [Aline da Silva de Azevedo](https://github.com/asazeved)
+- [Ana Júlia Lima Formiga](https://github.com/AnaJuliaFormiga)
+- [Caio Martin do Nascimento](https://github.com/Caio-Martin)
+
+
 
 ## Sumário
 
@@ -22,8 +31,8 @@ Desenvolvido no contexto acadêmico da disciplina de Desenvolvimento Mobile (Fac
 
 O NextInventory é um aplicativo móvel multiplataforma (iOS/Android) que permite:
 
-- Autenticação real via API REST dedicada
-- Cadastro, listagem, edição e exclusão de itens de inventário com persistência local
+- Autenticação real via API dedicada
+- Cadastro, listagem, edição e exclusão de itens de inventário com persistência local por usuário
 - Chat com assistente de IA contextualizado para suporte ao inventário
 - Recuperação de senha em duas etapas (simulada)
 
@@ -35,9 +44,8 @@ O NextInventory é um aplicativo móvel multiplataforma (iOS/Android) que permit
 
 - Campos de usuário e senha
 - Autenticação com API real: `https://mobile-ios-login.zani0x03.eti.br`
-- Token de acesso salvo em memória via singleton (`AuthService`)
-- Redirecionamento automático para a tela de inventário após sucesso
-
+- Token de acesso e username salvos em memória via singleton (`AuthService`)
+- Redirecionamento automático para a aplicação após login
 ### 2. Registro de usuário
 
 - Cadastro de novo usuário diretamente pela API
@@ -53,10 +61,10 @@ Fluxo simulado em duas etapas:
 
 ### 4. Inventário (CRUD)
 
-- Listagem de itens cadastrados ordenada por data de criação (mais novos primeiro)
+- Listagem de itens  por data de criação
 - Cadastro de novo item com:
   - Nome
-  - Código patrimonial gerado automaticamente (único)
+  - Código patrimonial gerado automaticamente   
   - Localização
   - Status
 - Edição de item existente
@@ -64,36 +72,24 @@ Fluxo simulado em duas etapas:
 
 ### 5. Chat com IA
 
-- Interface de chat com bolhas de mensagem diferenciadas (usuário / IA)
+- Interface de chat com bolhas de mensagem diferenciadas 
 - Indicador de carregamento enquanto aguarda resposta
 - Integração com endpoint de IA via `Bearer Token` herdado do login
 - Aceita campos de resposta: `response`, `message`, `answer` ou `content`
-
-### 6. Tela Sobre
-
-- Informações resumidas do aplicativo
-- Versão atual exibida na interface
 
 ---
 
 ## Tecnologias e arquitetura
 
-### Stack principal
 
-| Camada | Tecnologia |
-|---|---|
-| UI | Flutter / Dart |
-| HTTP | `http ^1.6.0` |
-| Banco local | `sqflite ^2.4.2` + `sqflite_common_ffi ^2.3.6` |
-| Caminhos | `path ^1.9.1` |
-| Ícones | `cupertino_icons ^1.0.8` |
 
 ### Padrões adotados
 
 - **Singleton** para `AuthService`, `AiService` e `InventoryDatabaseService`
-- Token de sessão gerenciado em memória via `AuthService.token` (estático)
+- Token de sessão e username do usuário gerenciados em memória via `AuthService` (campos estáticos)
 - Separação clara entre camadas: `screens/`, `services/`, `widgets/`, `utils/`, `models/`
 - Constantes centralizadas em `AppConstants` (`lib/utils/constants.dart`)
+- Isolamento de dados no banco local por username (`created_by`)
 
 ---
 
@@ -131,9 +127,9 @@ assets/
 |---|---|
 | `main.dart` | Inicialização do app, tema, rotas e FFI para desktop |
 | `utils/constants.dart` | URLs base e IDs de sistema |
-| `services/auth_service.dart` | Login, registro e logout contra a API real; guarda o token |
+| `services/auth_service.dart` | Login, registro e logout contra a API real; guarda token e username do usuário logado |
 | `services/ai_service.dart` | Envio de mensagens ao endpoint de IA com autenticação |
-| `services/inventory_database_service.dart` | CRUD local via SQLite |
+| `services/inventory_database_service.dart` | CRUD local via SQLite com isolamento por usuário (`created_by`) |
 | `screens/chat_screen.dart` | Interface de chat com a IA |
 | `widgets/chat_bubble.dart` | Componente de bolha de mensagem do chat |
 
@@ -149,9 +145,14 @@ assets/
 | Registro | `POST` | `https://mobile-ios-login.zani0x03.eti.br/api/register` |
 
 
-### Gerenciamento de token
+### Gerenciamento de sessão
 
-O token é armazenado em `AuthService._token` (singleton em memória) e compartilhado com `AiService` via `AuthService.token`. É limpo ao chamar `AuthService.instance.logout()`.
+Após o login bem-sucedido, o `AuthService` armazena em memória:
+
+- `AuthService.token` — Bearer token usado nas requisições autenticadas
+- `AuthService.currentUser` — username do usuário logado, usado como chave de isolamento no banco local
+
+Ambos são apagados ao chamar `AuthService.instance.logout()`.
 
 ---
 
@@ -212,8 +213,9 @@ Rotas registradas:
 
 - **Banco:** `nextinventory.db`
 - **Tabela:** `inventory_items`
+- **Versão atual do schema:** `2`
 
-### Schema
+### Schema (v2)
 
 | Coluna | Tipo | Restrição |
 |---|---|---|
@@ -223,12 +225,15 @@ Rotas registradas:
 | `location` | TEXT | NOT NULL |
 | `status` | TEXT | NOT NULL |
 | `created_at` | INTEGER | NOT NULL |
+| `created_by` | TEXT | NOT NULL, DEFAULT `''` |
 
-**Índice:** `idx_inventory_items_created_at` em `created_at DESC`
+**Índices:**
+- `idx_inventory_items_created_at` em `created_at DESC`
+- `idx_inventory_items_created_by` em `created_by`
 
 ### Regras
 
-- Código patrimonial único (restrição `UNIQUE`)
+- Código patrimonial único globalmente (restrição `UNIQUE`)
 - Mensagens de erro amigáveis para violações de constraints
 - Listagem ordenada por data de criação (mais novos primeiro)
 - Em modo desktop (Windows/Linux), usa `sqflite_common_ffi`

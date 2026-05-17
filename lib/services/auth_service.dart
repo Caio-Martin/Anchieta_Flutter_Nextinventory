@@ -18,6 +18,12 @@ class AuthService {
 
   static String? get token => _token;
 
+  /// Username do usuário autenticado. Null quando não autenticado.
+  static String? _currentUser;
+
+  /// Retorna o username do usuário logado (ou string vazia como fallback).
+  static String get currentUser => _currentUser ?? '';
+
   final http.Client _client = http.Client();
 
   // ─── Login ────────────────────────────────────────────────────────────────
@@ -54,7 +60,8 @@ class AuthService {
       }
 
       _token = accessToken.toString();
-      debugPrint('[AuthService] Token salvo: $_token');
+      _currentUser = username.trim();
+      debugPrint('[AuthService] Token salvo: $_token | Usuário: $_currentUser');
       return true;
     }
 
@@ -113,6 +120,7 @@ class AuthService {
 
   void logout() {
     _token = null;
-    debugPrint('[AuthService] Token removido.');
+    _currentUser = null;
+    debugPrint('[AuthService] Token e usuário removidos.');
   }
 }
