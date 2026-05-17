@@ -23,7 +23,6 @@ Desenvolvido para a disciplina de Desenvolvimento Mobile para IOS no [Centro Uni
 - [Assistente de IA](#assistente-de-ia)
 - [Fluxo de navegação](#fluxo-de-navegação)
 - [Persistência de dados (SQLite)](#persistência-de-dados-sqlite)
-- [Isolamento de dados por usuário](#isolamento-de-dados-por-usuário)
 - [Como executar o projeto](#como-executar-o-projeto)
 
 ---
