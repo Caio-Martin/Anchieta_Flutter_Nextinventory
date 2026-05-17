@@ -2,6 +2,9 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/inventory_item.dart';
+import '../services/auth_service.dart';
+
+// https://www.reddit.com/r/ProgrammerHumor/comments/rnr9h4/bomb_has_been_planted/?tl=pt-br
 
 class InventoryDatabaseException implements Exception {
   InventoryDatabaseException(this.message);
@@ -18,7 +21,8 @@ class InventoryDatabaseService {
   static final InventoryDatabaseService instance = InventoryDatabaseService._();
 
   static const _databaseName = 'nextinventory.db';
-  static const _databaseVersion = 1;
+  // Versão 2: adiciona coluna created_by para isolamento por usuário.
+  static const _databaseVersion = 2;
   static const _tableName = 'inventory_items';
 
   Database? _database;
@@ -54,30 +58,59 @@ class InventoryDatabaseService {
             code TEXT NOT NULL UNIQUE,
             location TEXT NOT NULL,
             status TEXT NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            created_by TEXT NOT NULL DEFAULT ''
           )
         ''');
 
         await db.execute(
           'CREATE INDEX idx_inventory_items_created_at ON $_tableName (created_at DESC)',
         );
+        await db.execute(
+          'CREATE INDEX idx_inventory_items_created_by ON $_tableName (created_by)',
+        );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        // Migração v1 → v2: adicionar coluna created_by
+        if (oldVersion < 2) {
+          await db.execute(
+            "ALTER TABLE $_tableName ADD COLUMN created_by TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_inventory_items_created_by ON $_tableName (created_by)',
+          );
+        }
       },
     );
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /// Username do usuário atualmente autenticado.
+  String get _currentUser => AuthService.currentUser;
+
+  // ── Leitura ──────────────────────────────────────────────────────────────
+
+  /// Retorna apenas os itens criados pelo usuário logado.
   Future<List<InventoryItem>> getItems() async {
     final db = await database;
-    final rows = await db.query(_tableName, orderBy: 'created_at DESC');
+    final rows = await db.query(
+      _tableName,
+      where: 'created_by = ?',
+      whereArgs: [_currentUser],
+      orderBy: 'created_at DESC',
+    );
 
     return rows.map(InventoryItem.fromMap).toList();
   }
 
+  /// Busca um item pelo ID, respeitando o escopo do usuário logado.
   Future<InventoryItem?> getItemById(String id) async {
     final db = await database;
     final rows = await db.query(
       _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND created_by = ?',
+      whereArgs: [id, _currentUser],
       limit: 1,
     );
 
@@ -88,6 +121,8 @@ class InventoryDatabaseService {
     return InventoryItem.fromMap(rows.first);
   }
 
+  // ── Escrita ──────────────────────────────────────────────────────────────
+
   Future<void> insertItem(InventoryItem item) async {
     final db = await database;
 
@@ -95,6 +130,7 @@ class InventoryDatabaseService {
       await db.insert(_tableName, {
         ...item.toMap(),
         'created_at': DateTime.now().millisecondsSinceEpoch,
+        'created_by': _currentUser,
       }, conflictAlgorithm: ConflictAlgorithm.abort);
     } on DatabaseException catch (error) {
       throw _mapDatabaseException(error);
@@ -107,6 +143,8 @@ class InventoryDatabaseService {
     required String location,
     required String status,
   }) async {
+    // ID gerado por timestamp em microsegundos: único globalmente,
+    // independente do usuário que está criando o item.
     final item = InventoryItem(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim(),
@@ -119,6 +157,7 @@ class InventoryDatabaseService {
     return item;
   }
 
+  /// Atualiza um item — apenas se ele pertencer ao usuário logado.
   Future<void> updateItem(InventoryItem item) async {
     final db = await database;
 
@@ -126,8 +165,8 @@ class InventoryDatabaseService {
       final updatedRows = await db.update(
         _tableName,
         item.toMap(),
-        where: 'id = ?',
-        whereArgs: [item.id],
+        where: 'id = ? AND created_by = ?',
+        whereArgs: [item.id, _currentUser],
         conflictAlgorithm: ConflictAlgorithm.abort,
       );
 
@@ -139,13 +178,14 @@ class InventoryDatabaseService {
     }
   }
 
+  /// Exclui um item — apenas se ele pertencer ao usuário logado.
   Future<bool> deleteItem(String id) async {
     final db = await database;
 
     final deletedRows = await db.delete(
       _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND created_by = ?',
+      whereArgs: [id, _currentUser],
     );
     return deletedRows > 0;
   }

@@ -30,7 +30,7 @@ class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
     super.dispose();
   }
 
-  Future<void> _sendVerificationCode() async {
+  Future<void> _sendVerificationCode() async { // capotemo o corsa 
     if (!_formKey.currentState!.validate()) {
       return;
     }
